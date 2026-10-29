@@ -1,0 +1,22 @@
+{
+  "ruta_datos": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\datos\\Datos_INGUAT.csv",
+  "sha256_datos": "2c817b40fe04bac123c7de5619e62641ebe71c45bb7bb46407174568a695cdb4",
+  "meses_con_datos": 210,
+  "meses_entrenamiento": 147,
+  "meses_validacion": 63,
+  "inicio_entrenamiento": "2009-01",
+  "fin_entrenamiento": "2021-03",
+  "inicio_validacion": "2021-04",
+  "fin_validacion": "2026-06",
+  "vias": [
+    "aereo",
+    "maritimo",
+    "terrestre"
+  ],
+  "meses_sin_cobertura_global": [],
+  "meses_sin_cobertura_por_via": {
+    "aereo": [],
+    "maritimo": [],
+    "terrestre": []
+  }
+}
