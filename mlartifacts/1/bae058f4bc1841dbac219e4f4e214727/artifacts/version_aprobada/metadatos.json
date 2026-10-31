@@ -1,0 +1,137 @@
+{
+  "id_ejecucion": "20261031T123304Z_888cb1b5",
+  "mlflow_run_id": "bae058f4bc1841dbac219e4f4e214727",
+  "fecha_publicacion": "2026-10-31T12:33:13+00:00",
+  "sha256_estimaciones": "4d1446fb79125d2ea8d9090ec8925def4570e50c69fbde43f23bb5e9438dfb7a",
+  "origen": {
+    "ruta": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\datos\\DATOS_ORIGINALES.csv",
+    "sha256": "2c817b40fe04bac123c7de5619e62641ebe71c45bb7bb46407174568a695cdb4",
+    "registros": 161036,
+    "frecuencia_declarada": "mensual"
+  },
+  "modelos": {
+    "AEREA": {
+      "tipo": "SARIMA",
+      "hiperparametros": {
+        "p": 1,
+        "d": 0,
+        "q": 1,
+        "P": 1,
+        "D": 0,
+        "Q": 0,
+        "S": 12,
+        "trend": null,
+        "enforce_stationarity": false,
+        "enforce_invertibility": false,
+        "maxiter": 200
+      },
+      "metricas": {
+        "mae_validacion": 5324.44593369419,
+        "mae_modelo": 5552.730362294544,
+        "mae_referencia": 17044.416666666668
+      },
+      "meses_evaluados": [
+        "2025-01",
+        "2025-02",
+        "2025-03",
+        "2025-04",
+        "2025-05",
+        "2025-06",
+        "2025-07",
+        "2025-08",
+        "2025-09",
+        "2025-10",
+        "2025-11",
+        "2025-12"
+      ],
+      "periodos": {
+        "train": [
+          "2009-01",
+          "2023-12"
+        ],
+        "validacion": [
+          "2024-01",
+          "2024-12"
+        ],
+        "prueba": [
+          "2025-01",
+          "2025-12"
+        ],
+        "pronostico": [
+          "2026-07",
+          "2026-08"
+        ]
+      },
+      "fallos_candidatos": [
+        "Suavizamiento exponencial simple {'optimized': True}: TypeError: initialization_method must be a string"
+      ]
+    },
+    "TERRESTRE": {
+      "tipo": "Holt-Winters",
+      "hiperparametros": {
+        "trend": "add",
+        "seasonal": "add",
+        "seasonal_periods": 12
+      },
+      "metricas": {
+        "mae_validacion": 21820.86710917355,
+        "mae_modelo": 13314.025979752,
+        "mae_referencia": 68446.21701880051
+      },
+      "meses_evaluados": [
+        "2025-01",
+        "2025-02",
+        "2025-03",
+        "2025-04",
+        "2025-05",
+        "2025-06",
+        "2025-07",
+        "2025-08",
+        "2025-09",
+        "2025-10",
+        "2025-11",
+        "2025-12"
+      ],
+      "periodos": {
+        "train": [
+          "2009-01",
+          "2023-12"
+        ],
+        "validacion": [
+          "2024-01",
+          "2024-12"
+        ],
+        "prueba": [
+          "2025-01",
+          "2025-12"
+        ],
+        "pronostico": [
+          "2026-07",
+          "2026-08"
+        ]
+      },
+      "fallos_candidatos": [
+        "Suavizamiento exponencial simple {'optimized': True}: TypeError: initialization_method must be a string"
+      ]
+    }
+  },
+  "calidad": {
+    "duplicados": 0,
+    "nulos": 0,
+    "faltantes_cobertura": 0
+  },
+  "aceptacion": {
+    "aprobado": true,
+    "razones": [],
+    "criterios": {
+      "exigir_controles_aprobados": true,
+      "exigir_salidas_completas": true,
+      "mae_maximo": 30000,
+      "requerir_superar_referencia": false,
+      "tolerancia_reproducibilidad": 1e-05,
+      "exigir_todas_las_vias": true
+    },
+    "evaluado_en": "2026-10-31T12:33:13+00:00"
+  },
+  "version_procedimiento": "1.0.0"
+}

@@ -1,0 +1,170 @@
+# Se ejecuta desde scripts/ con: python pipeline.py --config config.yaml
+# Configuración limitada deliberadamente a AEREA y TERRESTRE.
+# Las fechas de validación y pronóstico son propuestas provisionales: verificar
+# contra la cobertura real de ambas vías antes de entregar el laboratorio.
+# NO se publica nada sin destino y umbral MAE justificados.
+lectura:
+  separador: ';'
+  decimal: '.'
+  encoding: utf-8-sig
+rutas:
+  datos_originales: ../datos/DATOS_ORIGINALES.csv
+  datos_limpios: ../datos/DATOS_LIMPIOS.csv
+  resultados_candidatos: ../resultados/candidatos
+  resultados_aprobados: ../resultados/aprobados
+  version_vigente: ../resultados/version_vigente.json
+  reportes: ../reportes
+  modelos: ../modelos_guardados
+  logs: ../logs
+limpieza:
+  columnas:
+    Año: anio
+    Mes cod: mes
+    Vía: via
+    Frontera: frontera
+    País: pais
+    Tipo de Viajero: tipo_viajero
+    Viajero: cantidad_viajero
+  tipos_viajero:
+  - Excursionista
+  - Turista
+  paises_excluidos:
+  - Guatemala
+  vias_permitidas:
+  - AEREA
+  - TERRESTRE
+controles:
+  inicial:
+    anio_minimo: 2008
+    mes_minimo: 1
+    mes_maximo: 12
+    cantidad_minima: 0
+    columnas_faltantes_permitidas: []
+    duplicados_exactos_severidad: advertencia
+  final:
+    columnas_obligatorias:
+    - fecha
+    - via
+    - frontera
+    - pais
+    - tipo_viajero
+    - cantidad_viajero
+    columnas_texto:
+    - via
+    - frontera
+    - pais
+    - tipo_viajero
+    columnas_faltantes_permitidas: []
+    clave_unicidad:
+    - fecha
+    - via
+    - frontera
+    - pais
+    - tipo_viajero
+    cantidad_minima: 0
+    cobertura:
+      fecha_inicio: null
+      fecha_fin: null
+      vias_esperadas:
+      - AEREA
+      - TERRESTRE
+      severidad_faltantes: error
+      periodos_sin_cobertura_permitidos_por_via:
+        AEREA:
+        - 2020-04
+        - 2020-05
+        - 2020-06
+        - 2020-07
+        - 2020-08
+        TERRESTRE:
+        - 2020-04
+        - 2020-05
+        - 2020-06
+        - 2020-07
+        - 2020-08
+  metodologia:
+    frecuencia_esperada: mensual
+modelos:
+  semilla: 0
+  columna_via: via
+  columna_fecha: fecha
+  variable_objetivo: cantidad_viajero
+  vias:
+  - AEREA
+  - TERRESTRE
+  habilitados:
+  - SARIMA
+  - Prophet
+  - Holt-Winters
+  - Suavizamiento exponencial simple
+  validacion:
+    metrica: mae
+    inicio_validacion: 2024-01
+    fin_validacion: 2024-12
+    inicio_prueba: 2025-01
+    fin_prueba: 2025-12
+  pronostico:
+    horizonte_meses: 2
+    fecha_inicio: 2026-07
+  referencia:
+    estrategia: ultimo
+    ventana_meses: 12
+  pandemia:
+    aplicar: true
+    inicio: 2020-03
+    fin: 2022-12
+    minimo_meses: 24
+    estrategia: last
+    periodicidad: 12
+  sarima:
+    p:
+    - 0
+    - 1
+    d:
+    - 0
+    - 1
+    q:
+    - 0
+    - 1
+    P:
+    - 0
+    - 1
+    D:
+    - 0
+    Q:
+    - 0
+    S: 12
+    trend: null
+    enforce_stationarity: false
+    enforce_invertibility: false
+    maxiter: 200
+  prophet:
+    yearly_seasonality: auto
+    weekly_seasonality: false
+    daily_seasonality: false
+  holt_winters:
+    trend: add
+    seasonal: add
+    seasonal_periods: 12
+  suavizamiento_simple:
+    optimized: true
+aceptacion:
+  exigir_controles_aprobados: true
+  exigir_salidas_completas: true
+  mae_maximo: 30000
+  requerir_superar_referencia: false
+  tolerancia_reproducibilidad: 1.0e-05
+  exigir_todas_las_vias: true
+mlflow:
+  tracking_uri: http://mlflow:5000
+  experimento: Observatorio_Inteligencia_Turistica
+monitoreo:
+  variacion_relativa_maxima: null
+  umbral_duplicados: 0
+  umbral_faltantes_criticos: 0
+  alertar_actualizacion_atrasada: true
+publicacion:
+  destino: Guatemala
+  unidad: viajeros
+  version_procedimiento: 1.0.0
+  factor_reparto: 0.4

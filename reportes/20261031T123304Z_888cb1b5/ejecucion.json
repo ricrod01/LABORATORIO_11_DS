@@ -1,0 +1,341 @@
+{
+  "id_ejecucion": "20261031T123304Z_888cb1b5",
+  "mlflow_run_id": "bae058f4bc1841dbac219e4f4e214727",
+  "inicio": "2026-10-31T12:33:04+00:00",
+  "fin": "2026-10-31T12:33:13+00:00",
+  "estado": "publicado",
+  "publicacion": "aprobado_y_publicado",
+  "etapas": [
+    {
+      "nombre": "lectura",
+      "inicio": "2026-10-31T12:33:04+00:00",
+      "estado": "completada",
+      "fin": "2026-10-31T12:33:04+00:00"
+    },
+    {
+      "nombre": "limpieza_y_controles",
+      "inicio": "2026-10-31T12:33:04+00:00",
+      "estado": "completada",
+      "fin": "2026-10-31T12:33:06+00:00"
+    },
+    {
+      "nombre": "modelado_y_evaluacion",
+      "inicio": "2026-10-31T12:33:06+00:00",
+      "estado": "completada",
+      "fin": "2026-10-31T12:33:13+00:00"
+    },
+    {
+      "nombre": "monitoreo",
+      "inicio": "2026-10-31T12:33:13+00:00",
+      "estado": "completada",
+      "fin": "2026-10-31T12:33:13+00:00"
+    },
+    {
+      "nombre": "publicacion",
+      "inicio": "2026-10-31T12:33:13+00:00",
+      "estado": "completada",
+      "fin": "2026-10-31T12:33:13+00:00"
+    }
+  ],
+  "controles": {
+    "inicial": {
+      "aprobado": true,
+      "errores": [],
+      "advertencias": [
+        "Se conservan 43145 cantidades decimales de la fuente"
+      ],
+      "registros": 161036,
+      "detalle": {
+        "duplicados_exactos_fuente": 0,
+        "nulos_Año": 0,
+        "nulos_Mes cod": 0,
+        "nulos_Vía": 0,
+        "nulos_Frontera": 0,
+        "nulos_País": 0,
+        "nulos_Tipo de Viajero": 0,
+        "nulos_Viajero": 0,
+        "fechas_invalidas": 0,
+        "cantidades_invalidas": 0,
+        "cantidades_decimales": 43145
+      }
+    },
+    "final": {
+      "aprobado": true,
+      "errores": [],
+      "advertencias": [
+        "Cobertura sin límites explícitos: puede omitir meses extremos",
+        "AEREA: 5 meses sin cobertura declarados: ['2020-04', '2020-05', '2020-06', '2020-07', '2020-08']",
+        "TERRESTRE: 5 meses sin cobertura declarados: ['2020-04', '2020-05', '2020-06', '2020-07', '2020-08']"
+      ],
+      "registros": 125183,
+      "detalle": {
+        "nulos_fecha": 0,
+        "nulos_via": 0,
+        "nulos_frontera": 0,
+        "nulos_pais": 0,
+        "nulos_tipo_viajero": 0,
+        "nulos_cantidad_viajero": 0,
+        "duplicados": 0,
+        "cobertura_AEREA": {
+          "esperados": 210,
+          "faltantes_criticos": 0,
+          "faltantes_permitidos": 5
+        },
+        "cobertura_TERRESTRE": {
+          "esperados": 210,
+          "faltantes_criticos": 0,
+          "faltantes_permitidos": 5
+        }
+      }
+    },
+    "metodologia": {
+      "aprobado": true,
+      "errores": [],
+      "advertencias": [],
+      "registros": 125183,
+      "detalle": {
+        "fuente_utilizada": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\datos\\DATOS_ORIGINALES.csv",
+        "frecuencia_declarada": "mensual"
+      }
+    },
+    "estimaciones": {
+      "aprobado": true,
+      "errores": [],
+      "advertencias": [],
+      "registros": 4,
+      "detalle": {}
+    }
+  },
+  "advertencias": [
+    "Hay cambios sin confirmar en Git; revisa huellas_codigo del reporte para garantizar trazabilidad",
+    "inicial: Se conservan 43145 cantidades decimales de la fuente",
+    "Consolidación por frontera, país, tipo y mes: 17 filas agrupadas sin perder su suma",
+    "final: Cobertura sin límites explícitos: puede omitir meses extremos",
+    "final: AEREA: 5 meses sin cobertura declarados: ['2020-04', '2020-05', '2020-06', '2020-07', '2020-08']",
+    "final: TERRESTRE: 5 meses sin cobertura declarados: ['2020-04', '2020-05', '2020-06', '2020-07', '2020-08']",
+    "No se configuró fecha_fin de cobertura: no es posible verificar actualización contra el período esperado",
+    "No se configuró variacion_relativa_maxima; monitoreo de cambios deshabilitado"
+  ],
+  "errores": [],
+  "metricas": {
+    "mae_validacion_aerea": 5324.44593369419,
+    "mae_modelo_aerea": 5552.730362294544,
+    "mae_referencia_aerea": 17044.416666666668,
+    "mae_validacion_terrestre": 21820.86710917355,
+    "mae_modelo_terrestre": 13314.025979752,
+    "mae_referencia_terrestre": 68446.21701880051
+  },
+  "modelos": {
+    "AEREA": {
+      "tipo": "SARIMA",
+      "hiperparametros": {
+        "p": 1,
+        "d": 0,
+        "q": 1,
+        "P": 1,
+        "D": 0,
+        "Q": 0,
+        "S": 12,
+        "trend": null,
+        "enforce_stationarity": false,
+        "enforce_invertibility": false,
+        "maxiter": 200
+      },
+      "metricas": {
+        "mae_validacion": 5324.44593369419,
+        "mae_modelo": 5552.730362294544,
+        "mae_referencia": 17044.416666666668
+      },
+      "meses_evaluados": [
+        "2025-01",
+        "2025-02",
+        "2025-03",
+        "2025-04",
+        "2025-05",
+        "2025-06",
+        "2025-07",
+        "2025-08",
+        "2025-09",
+        "2025-10",
+        "2025-11",
+        "2025-12"
+      ],
+      "periodos": {
+        "train": [
+          "2009-01",
+          "2023-12"
+        ],
+        "validacion": [
+          "2024-01",
+          "2024-12"
+        ],
+        "prueba": [
+          "2025-01",
+          "2025-12"
+        ],
+        "pronostico": [
+          "2026-07",
+          "2026-08"
+        ]
+      },
+      "fallos_candidatos": [
+        "Suavizamiento exponencial simple {'optimized': True}: TypeError: initialization_method must be a string"
+      ]
+    },
+    "TERRESTRE": {
+      "tipo": "Holt-Winters",
+      "hiperparametros": {
+        "trend": "add",
+        "seasonal": "add",
+        "seasonal_periods": 12
+      },
+      "metricas": {
+        "mae_validacion": 21820.86710917355,
+        "mae_modelo": 13314.025979752,
+        "mae_referencia": 68446.21701880051
+      },
+      "meses_evaluados": [
+        "2025-01",
+        "2025-02",
+        "2025-03",
+        "2025-04",
+        "2025-05",
+        "2025-06",
+        "2025-07",
+        "2025-08",
+        "2025-09",
+        "2025-10",
+        "2025-11",
+        "2025-12"
+      ],
+      "periodos": {
+        "train": [
+          "2009-01",
+          "2023-12"
+        ],
+        "validacion": [
+          "2024-01",
+          "2024-12"
+        ],
+        "prueba": [
+          "2025-01",
+          "2025-12"
+        ],
+        "pronostico": [
+          "2026-07",
+          "2026-08"
+        ]
+      },
+      "fallos_candidatos": [
+        "Suavizamiento exponencial simple {'optimized': True}: TypeError: initialization_method must be a string"
+      ]
+    }
+  },
+  "monitoreo": {
+    "alertas": [
+      "No se configuró fecha_fin de cobertura: no es posible verificar actualización contra el período esperado",
+      "No se configuró variacion_relativa_maxima; monitoreo de cambios deshabilitado"
+    ],
+    "ultimo_mes_observado": "2026-06"
+  },
+  "origen": {
+    "ruta": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\datos\\DATOS_ORIGINALES.csv",
+    "sha256": "2c817b40fe04bac123c7de5619e62641ebe71c45bb7bb46407174568a695cdb4",
+    "registros": 161036,
+    "frecuencia_declarada": "mensual"
+  },
+  "archivos": {
+    "datos_limpios": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\datos\\DATOS_LIMPIOS.csv",
+    "modelo_aerea": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\modelos_guardados\\20261031T123304Z_888cb1b5\\aerea.joblib",
+    "modelo_terrestre": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\modelos_guardados\\20261031T123304Z_888cb1b5\\terrestre.joblib",
+    "estimaciones_candidatas": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\resultados\\candidatos\\20261031T123304Z_888cb1b5\\estimaciones.csv"
+  },
+  "aceptacion": {
+    "aprobado": true,
+    "razones": [],
+    "criterios": {
+      "exigir_controles_aprobados": true,
+      "exigir_salidas_completas": true,
+      "mae_maximo": 30000,
+      "requerir_superar_referencia": false,
+      "tolerancia_reproducibilidad": 1e-05,
+      "exigir_todas_las_vias": true
+    },
+    "evaluado_en": "2026-10-31T12:33:13+00:00"
+  },
+  "config_sha256": "b7ef6e21695c2dd701cabc3c5e9c078ddef966f58e0f1b5cd8d58ae783e8e15f",
+  "dependencias": {
+    "python": "3.14.0",
+    "sistema": "Windows-11-10.0.26300-SP0",
+    "pandas": "2.3.3",
+    "numpy": "2.3.4",
+    "scikit-learn": "1.7.2",
+    "statsmodels": "0.15.0",
+    "prophet": "1.5.0",
+    "sktime": "0.40.1",
+    "mlflow": "3.17.2",
+    "PyYAML": "6.0.3",
+    "joblib": "1.5.3"
+  },
+  "git_commit": "dbcd9c94e94c5a14f24234829244e723c0e57193",
+  "git_modificaciones": "D DATOS_LIMPIOS.csv\n D config.yaml\n D controles.py\n D datos/Datos_INGUAT.csv\n D pipeline.py\n M requirements.txt\n D resultados/preparacion/entrenamiento.csv\n D resultados/preparacion/reporte_preparacion.json\n D resultados/preparacion/series_mensuales.csv\n D resultados/preparacion/validacion.csv\n?? datos/DATOS_LIMPIOS.csv\n?? datos/DATOS_ORIGINALES.csv\n?? mlflow.db\n?? scripts/",
+  "huellas_codigo": {
+    "pipeline.py": "fe3ad3c6ac60ed88f1ad73788d8ab1c47149e385ff18b96b3d0c8ef3d29cc5c7",
+    "funciones_limpieza.py": "76b3faa8c1699acb650eb6cf4521b38e3e8f9be7362849522691b403a88eb40d",
+    "controles.py": "c02c814a85d53a4fc696cb45952369b03fc9f82f61d3614ed778da1aabf2cd93",
+    "ajustes_modelos.py": "d503b4aba996f9b10768e3ca815a70cc00dfc01aaa314d9691607d2170b7254a"
+  },
+  "consolidacion": {
+    "filas_antes": 125200,
+    "grupos_repetidos": 16,
+    "filas_adicionales_consolidadas": 17,
+    "clave_consolidacion": [
+      "fecha",
+      "via",
+      "frontera",
+      "pais",
+      "tipo_viajero"
+    ],
+    "suma_antes": 32757681.538583588,
+    "filas_despues": 125183,
+    "suma_despues": 32757681.53858359
+  },
+  "periodos_por_via": {
+    "AEREA": {
+      "train": [
+        "2009-01",
+        "2023-12"
+      ],
+      "validacion": [
+        "2024-01",
+        "2024-12"
+      ],
+      "prueba": [
+        "2025-01",
+        "2025-12"
+      ],
+      "pronostico": [
+        "2026-07",
+        "2026-08"
+      ]
+    },
+    "TERRESTRE": {
+      "train": [
+        "2009-01",
+        "2023-12"
+      ],
+      "validacion": [
+        "2024-01",
+        "2024-12"
+      ],
+      "prueba": [
+        "2025-01",
+        "2025-12"
+      ],
+      "pronostico": [
+        "2026-07",
+        "2026-08"
+      ]
+    }
+  }
+}
