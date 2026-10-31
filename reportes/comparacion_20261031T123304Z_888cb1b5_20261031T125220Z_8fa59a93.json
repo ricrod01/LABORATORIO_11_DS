@@ -1,0 +1,15 @@
+{
+  "ejecuciones": [
+    "20261031T123304Z_888cb1b5",
+    "20261031T125220Z_8fa59a93"
+  ],
+  "misma_fuente": true,
+  "misma_configuracion": true,
+  "mismo_commit": false,
+  "mismas_dependencias": true,
+  "mismos_modelos": true,
+  "diferencia_maxima": 0.0,
+  "diferencia_maxima_metricas": 0.0,
+  "tolerancia_absoluta": 1e-05,
+  "equivalentes": true
+}
