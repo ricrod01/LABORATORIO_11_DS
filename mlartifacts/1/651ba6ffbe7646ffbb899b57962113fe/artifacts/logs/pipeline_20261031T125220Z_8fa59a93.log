@@ -1,0 +1,25 @@
+2026-10-31 06:52:20 | INFO | Inicio de ejecución: 20261031T125220Z_8fa59a93
+2026-10-31 06:52:20 | INFO | Etapa iniciada: lectura
+2026-10-31 06:52:20 | INFO | Etapa terminada: lectura (completada)
+2026-10-31 06:52:20 | INFO | Etapa iniciada: limpieza_y_controles
+2026-10-31 06:52:20 | WARNING | inicial | Se conservan 43145 cantidades decimales de la fuente
+2026-10-31 06:52:20 | INFO | Control aprobado: inicial
+2026-10-31 06:52:21 | WARNING | Consolidación por frontera, país, tipo y mes: 17 filas agrupadas sin perder su suma
+2026-10-31 06:52:21 | WARNING | final | Cobertura sin límites explícitos: puede omitir meses extremos
+2026-10-31 06:52:21 | WARNING | final | AEREA: 5 meses sin cobertura declarados: ['2020-04', '2020-05', '2020-06', '2020-07', '2020-08']
+2026-10-31 06:52:21 | WARNING | final | TERRESTRE: 5 meses sin cobertura declarados: ['2020-04', '2020-05', '2020-06', '2020-07', '2020-08']
+2026-10-31 06:52:21 | INFO | Control aprobado: final
+2026-10-31 06:52:21 | INFO | Control aprobado: metodologia
+2026-10-31 06:52:22 | INFO | Etapa terminada: limpieza_y_controles (completada)
+2026-10-31 06:52:22 | INFO | Etapa iniciada: modelado_y_evaluacion
+2026-10-31 06:52:22 | INFO | Modelado de la vía: AEREA
+2026-10-31 06:52:32 | WARNING | AEREA | candidato descartado: Suavizamiento exponencial simple {'optimized': True}: TypeError: initialization_method must be a string
+2026-10-31 06:52:32 | INFO | Modelado de la vía: TERRESTRE
+2026-10-31 06:52:32 | WARNING | TERRESTRE | candidato descartado: Suavizamiento exponencial simple {'optimized': True}: TypeError: initialization_method must be a string
+2026-10-31 06:52:32 | INFO | Etapa terminada: modelado_y_evaluacion (completada)
+2026-10-31 06:52:32 | INFO | Control aprobado: estimaciones
+2026-10-31 06:52:32 | INFO | Etapa iniciada: monitoreo
+2026-10-31 06:52:32 | INFO | Etapa terminada: monitoreo (completada)
+2026-10-31 06:52:32 | INFO | Etapa iniciada: publicacion
+2026-10-31 06:52:32 | INFO | Versión aprobada y publicada: C:\Users\ricro\OneDrive\Desktop\Carrera Mate\6to Semestre\DATA SCIENCE\LABORATORIO_11\LABORATORIO_11_DS\resultados\aprobados\20261031T125220Z_8fa59a93
+2026-10-31 06:52:32 | INFO | Etapa terminada: publicacion (completada)

@@ -1,0 +1,13 @@
+{
+  "aprobado": true,
+  "razones": [],
+  "criterios": {
+    "exigir_controles_aprobados": true,
+    "exigir_salidas_completas": true,
+    "mae_maximo": 30000,
+    "requerir_superar_referencia": false,
+    "tolerancia_reproducibilidad": 1e-05,
+    "exigir_todas_las_vias": true
+  },
+  "evaluado_en": "2026-10-31T12:52:32+00:00"
+}

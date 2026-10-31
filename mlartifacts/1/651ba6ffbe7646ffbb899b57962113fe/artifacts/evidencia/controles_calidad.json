@@ -1,0 +1,62 @@
+{
+  "inicial": {
+    "aprobado": true,
+    "errores": [],
+    "advertencias": [
+      "Se conservan 43145 cantidades decimales de la fuente"
+    ],
+    "registros": 161036,
+    "detalle": {
+      "duplicados_exactos_fuente": 0,
+      "nulos_Año": 0,
+      "nulos_Mes cod": 0,
+      "nulos_Vía": 0,
+      "nulos_Frontera": 0,
+      "nulos_País": 0,
+      "nulos_Tipo de Viajero": 0,
+      "nulos_Viajero": 0,
+      "fechas_invalidas": 0,
+      "cantidades_invalidas": 0,
+      "cantidades_decimales": 43145
+    }
+  },
+  "final": {
+    "aprobado": true,
+    "errores": [],
+    "advertencias": [
+      "Cobertura sin límites explícitos: puede omitir meses extremos",
+      "AEREA: 5 meses sin cobertura declarados: ['2020-04', '2020-05', '2020-06', '2020-07', '2020-08']",
+      "TERRESTRE: 5 meses sin cobertura declarados: ['2020-04', '2020-05', '2020-06', '2020-07', '2020-08']"
+    ],
+    "registros": 125183,
+    "detalle": {
+      "nulos_fecha": 0,
+      "nulos_via": 0,
+      "nulos_frontera": 0,
+      "nulos_pais": 0,
+      "nulos_tipo_viajero": 0,
+      "nulos_cantidad_viajero": 0,
+      "duplicados": 0,
+      "cobertura_AEREA": {
+        "esperados": 210,
+        "faltantes_criticos": 0,
+        "faltantes_permitidos": 5
+      },
+      "cobertura_TERRESTRE": {
+        "esperados": 210,
+        "faltantes_criticos": 0,
+        "faltantes_permitidos": 5
+      }
+    }
+  },
+  "metodologia": {
+    "aprobado": true,
+    "errores": [],
+    "advertencias": [],
+    "registros": 125183,
+    "detalle": {
+      "fuente_utilizada": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\datos\\DATOS_ORIGINALES.csv",
+      "frecuencia_declarada": "mensual"
+    }
+  }
+}

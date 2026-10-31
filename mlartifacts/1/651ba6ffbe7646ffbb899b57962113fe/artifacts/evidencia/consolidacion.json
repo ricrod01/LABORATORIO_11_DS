@@ -1,0 +1,15 @@
+{
+  "filas_antes": 125200,
+  "grupos_repetidos": 16,
+  "filas_adicionales_consolidadas": 17,
+  "clave_consolidacion": [
+    "fecha",
+    "via",
+    "frontera",
+    "pais",
+    "tipo_viajero"
+  ],
+  "suma_antes": 32757681.538583588,
+  "filas_despues": 125183,
+  "suma_despues": 32757681.53858359
+}

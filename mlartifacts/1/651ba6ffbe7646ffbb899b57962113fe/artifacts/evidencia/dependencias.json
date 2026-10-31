@@ -1,0 +1,13 @@
+{
+  "python": "3.14.0",
+  "sistema": "Windows-11-10.0.26300-SP0",
+  "pandas": "2.3.3",
+  "numpy": "2.3.4",
+  "scikit-learn": "1.7.2",
+  "statsmodels": "0.15.0",
+  "prophet": "1.5.0",
+  "sktime": "0.40.1",
+  "mlflow": "3.17.2",
+  "PyYAML": "6.0.3",
+  "joblib": "1.5.3"
+}
