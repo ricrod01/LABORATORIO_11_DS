@@ -1,0 +1,73 @@
+{
+  "id_ejecucion": "20261031T170056Z_129d3d60",
+  "mlflow_run_id": "98e0bf62886742c6b8b41bfb8a77cdb2",
+  "inicio": "2026-10-31T17:00:56+00:00",
+  "fin": "2026-10-31T17:00:57+00:00",
+  "estado": "fallido",
+  "publicacion": "no_publicado",
+  "etapas": [
+    {
+      "nombre": "lectura",
+      "inicio": "2026-10-31T17:00:57+00:00",
+      "estado": "completada",
+      "fin": "2026-10-31T17:00:57+00:00"
+    },
+    {
+      "nombre": "limpieza_y_controles",
+      "inicio": "2026-10-31T17:00:57+00:00",
+      "estado": "fallida",
+      "fin": "2026-10-31T17:00:57+00:00"
+    }
+  ],
+  "controles": {
+    "inicial": {
+      "aprobado": false,
+      "errores": [
+        "Columnas originales faltantes: ['Viajero']"
+      ],
+      "advertencias": [],
+      "registros": 161036,
+      "detalle": {}
+    }
+  },
+  "advertencias": [
+    "Hay cambios sin confirmar en Git; revisa huellas_codigo del reporte para garantizar trazabilidad"
+  ],
+  "errores": [
+    "inicial: Columnas originales faltantes: ['Viajero']",
+    "FalloControl: Control crítico no aprobado: inicial"
+  ],
+  "metricas": {},
+  "modelos": {},
+  "monitoreo": {},
+  "origen": {
+    "ruta": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\datos\\DATOS_FALLO.csv",
+    "sha256": "b60efc261514c1405c54fd371b7be64715f6779eff768174b021a5b34e72314c",
+    "registros": 161036,
+    "frecuencia_declarada": "mensual"
+  },
+  "archivos": {},
+  "aceptacion": {},
+  "config_sha256": "0cc0fc0a42685b2b14d7165c6beccc0773915bb42027f5062d942265b60c7869",
+  "dependencias": {
+    "python": "3.14.0",
+    "sistema": "Windows-11-10.0.26300-SP0",
+    "pandas": "2.3.3",
+    "numpy": "2.3.4",
+    "scikit-learn": "1.7.2",
+    "statsmodels": "0.15.0",
+    "prophet": "1.5.0",
+    "sktime": "0.40.1",
+    "mlflow": "3.17.2",
+    "PyYAML": "6.0.3",
+    "joblib": "1.5.3"
+  },
+  "git_commit": "cef82761ecc4acefc23bb29cb116bca1099e369c",
+  "git_modificaciones": "?? datos/DATOS_FALLO.csv\n?? scripts/config_fallo.yaml",
+  "huellas_codigo": {
+    "pipeline.py": "fe3ad3c6ac60ed88f1ad73788d8ab1c47149e385ff18b96b3d0c8ef3d29cc5c7",
+    "funciones_limpieza.py": "76b3faa8c1699acb650eb6cf4521b38e3e8f9be7362849522691b403a88eb40d",
+    "controles.py": "c02c814a85d53a4fc696cb45952369b03fc9f82f61d3614ed778da1aabf2cd93",
+    "ajustes_modelos.py": "d503b4aba996f9b10768e3ca815a70cc00dfc01aaa314d9691607d2170b7254a"
+  }
+}

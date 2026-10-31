@@ -1,0 +1,23 @@
+2026-10-31 11:00:56 | INFO | Inicio de ejecución: 20261031T170056Z_129d3d60
+2026-10-31 11:00:57 | WARNING | Hay cambios sin confirmar en Git; revisa huellas_codigo del reporte para garantizar trazabilidad
+2026-10-31 11:00:57 | INFO | Etapa iniciada: lectura
+2026-10-31 11:00:57 | INFO | Etapa terminada: lectura (completada)
+2026-10-31 11:00:57 | INFO | Etapa iniciada: limpieza_y_controles
+2026-10-31 11:00:57 | ERROR | inicial | Columnas originales faltantes: ['Viajero']
+2026-10-31 11:00:57 | INFO | Etapa terminada: limpieza_y_controles (fallida)
+2026-10-31 11:00:57 | ERROR | Ejecución interrumpida
+Traceback (most recent call last):
+  File "C:\Users\ricro\OneDrive\Desktop\Carrera Mate\6to Semestre\DATA SCIENCE\LABORATORIO_11\LABORATORIO_11_DS\scripts\pipeline.py", line 545, in ejecutar
+    limpio = etapa(informe, logger, 'limpieza_y_controles',
+                   lambda: limpiar_y_validar(datos, config, informe, mlflow, logger, carpeta))
+  File "C:\Users\ricro\OneDrive\Desktop\Carrera Mate\6to Semestre\DATA SCIENCE\LABORATORIO_11\LABORATORIO_11_DS\scripts\pipeline.py", line 146, in etapa
+    resultado = funcion()
+  File "C:\Users\ricro\OneDrive\Desktop\Carrera Mate\6to Semestre\DATA SCIENCE\LABORATORIO_11\LABORATORIO_11_DS\scripts\pipeline.py", line 546, in <lambda>
+    lambda: limpiar_y_validar(datos, config, informe, mlflow, logger, carpeta))
+            ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ricro\OneDrive\Desktop\Carrera Mate\6to Semestre\DATA SCIENCE\LABORATORIO_11\LABORATORIO_11_DS\scripts\pipeline.py", line 200, in limpiar_y_validar
+    registrar_control('inicial', validacion_inicial(datos, config), informe, mlflow, logger)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ricro\OneDrive\Desktop\Carrera Mate\6to Semestre\DATA SCIENCE\LABORATORIO_11\LABORATORIO_11_DS\scripts\pipeline.py", line 136, in registrar_control
+    raise FalloControl(f'Control crítico no aprobado: {nombre}')
+FalloControl: Control crítico no aprobado: inicial
