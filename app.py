@@ -4,6 +4,9 @@ Ejecucion local:
     streamlit run app.py
 """
 
+import hashlib
+import json
+import re
 from pathlib import Path
 
 import joblib
@@ -22,12 +25,14 @@ st.set_page_config(
 )
 
 ROOT = Path(__file__).resolve().parent
-CSV_PATH = ROOT / "DATOS_LIMPIOS.csv"
-MODEL_PATHS = {
-    "Aerea": ROOT / "modelo_aereo.joblib",
-    "Maritima": ROOT / "modelo_maritimo.joblib",
-    "Terrestre": ROOT / "modelo_terrestre.joblib",
-}
+CSV_PATH = ROOT / "datos" / "DATOS_LIMPIOS.csv"
+VERSION_PATH = ROOT / "resultados" / "version_vigente.json"
+APROBADOS_DIR = ROOT / "resultados" / "aprobados"
+MODELOS_DIR = ROOT / "modelos_guardados"
+REPORTES_DIR = ROOT / "reportes"
+
+# Únicamente las dos vías que utiliza el pipeline de MLOps.
+VIAS = {"AEREA": "Aérea", "TERRESTRE": "Terrestre"}
 
 PETROLEO = "#123B4A"
 TURQUESA = "#19A7A0"
@@ -36,45 +41,128 @@ CORAL = "#E45B4F"
 BLANCO = "#FFFFFF"
 TEXTO_SUAVE = "#5E6D72"
 MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-MODEL_INFO = {
-    "Aerea": {
-        "via": "A\u00e9rea",
-        "nombre": "Holt-Winters",
-        "corte": pd.Timestamp("2021-04-01"),
-        "intervalo": "95% aproximado",
-    },
-    "Maritima": {
-        "via": "Mar\u00edtima",
-        "nombre": "SARIMAX",
-        "corte": pd.Timestamp("2016-08-01"),
-        "intervalo": "95%",
-    },
-    "Terrestre": {
-        "via": "Terrestre",
-        "nombre": "Prophet",
-        "corte": pd.Timestamp("2021-04-01"),
-        "intervalo": "80%",
-    },
-}
+def verificar_version_publicada() -> dict | None:
+    """Resuelve la última versión *vigente* (incluye restauraciones).
+
+    Nunca selecciona una carpeta por fecha, porque un run fallido o rechazado
+    podría ser posterior a la última publicación aprobada.
+    """
+    if not VERSION_PATH.is_file():
+        return None
+
+    with VERSION_PATH.open("r", encoding="utf-8") as archivo:
+        puntero = json.load(archivo)
+
+    identificador = puntero.get("id_ejecucion", "")
+    if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z_[0-9a-f]{8}", identificador):
+        raise ValueError("El identificador en version_vigente.json no es válido.")
+
+    carpeta_aprobada = APROBADOS_DIR / identificador
+    carpeta_modelos = MODELOS_DIR / identificador
+    ruta_predicciones = carpeta_aprobada / "estimaciones.csv"
+    ruta_metadatos = carpeta_aprobada / "metadatos.json"
+    for ruta in (ruta_predicciones, ruta_metadatos):
+        if not ruta.is_file():
+            raise FileNotFoundError(f"Falta el archivo de la versión vigente: {ruta}")
+
+    with ruta_metadatos.open("r", encoding="utf-8") as archivo:
+        metadatos = json.load(archivo)
+
+    if metadatos.get("id_ejecucion") != identificador:
+        raise ValueError("El identificador de los metadatos no coincide con la versión vigente.")
+    if not metadatos.get("aceptacion", {}).get("aprobado", False):
+        raise ValueError("La versión señalada no figura como aprobada.")
+
+    huella = hashlib.sha256(ruta_predicciones.read_bytes()).hexdigest()
+    if huella != metadatos.get("sha256_estimaciones"):
+        raise ValueError("La huella SHA256 de estimaciones.csv no coincide con los metadatos.")
+
+    return {
+        "id": identificador,
+        "puntero": puntero,
+        "metadatos": metadatos,
+        "ruta_predicciones": ruta_predicciones,
+        "carpeta_modelos": carpeta_modelos,
+    }
 
 
 @st.cache_data(show_spinner="Preparando indicadores...")
-def load_data(path: str, modified: float) -> pd.DataFrame:
-    """Carga y normaliza la fuente; modified invalida el cache al cambiar el CSV."""
+def load_data(path: str, modified_ns: int) -> pd.DataFrame:
+    """Carga los datos limpios reales del pipeline, sin volver a procesarlos."""
+    del modified_ns  # Su valor sirve para invalidar el caché cuando cambia el CSV.
     data = pd.read_csv(path, low_memory=False)
-    data["Fecha"] = pd.to_datetime(data["Fecha"], errors="coerce")
-    data["Viajero"] = pd.to_numeric(data["Viajero"], errors="coerce")
-    data = data.dropna(subset=["Fecha", "Viajero"])
-    data = data[data["Tipo de Viajero"].isin(["Turista", "Excursionista"])].copy()
+    data = data.rename(columns={
+        "fecha": "Fecha", "via": "Via", "país": "Pais", "pais": "Pais",
+        "tipo_viajero": "Tipo de Viajero", "cantidad_viajero": "Viajero",
+        "Vía": "Via", "País": "Pais",
+    })
+    requeridas = {"Fecha", "Via", "Pais", "Tipo de Viajero", "Viajero"}
+    faltantes = requeridas.difference(data.columns)
+    if faltantes:
+        raise ValueError(f"Faltan columnas en DATOS_LIMPIOS.csv: {sorted(faltantes)}")
+
+    data["Fecha"] = pd.to_datetime(data["Fecha"], errors="raise")
+    data["Viajero"] = pd.to_numeric(data["Viajero"], errors="raise")
+    data["Via"] = (data["Via"].astype("string").str.strip()
+                   .str.normalize("NFKD").str.replace(r"[\u0300-\u036f]", "", regex=True)
+                   .str.upper())
+    data["Pais"] = data["Pais"].astype("string").str.strip().str.upper()
+    data["Tipo de Viajero"] = data["Tipo de Viajero"].astype("string").str.strip().str.title()
+    data = data.loc[
+        data["Via"].isin(VIAS)
+        & data["Tipo de Viajero"].isin(["Turista", "Excursionista"])
+        & (data["Pais"] != "GUATEMALA")
+    ].copy()
+    if data.empty:
+        raise ValueError("La fuente limpia no contiene datos para AEREA y TERRESTRE.")
     data["Anio"] = data["Fecha"].dt.year
     data["Mes"] = data["Fecha"].dt.month
     return data
 
 
-@st.cache_resource(show_spinner="Cargando modelos existentes...")
-def load_models(model_stamps: tuple[tuple[str, float], ...]) -> dict:
-    del model_stamps
-    return {name: joblib.load(path) for name, path in MODEL_PATHS.items()}
+@st.cache_data(show_spinner="Leyendo estimaciones aprobadas...")
+def load_published_forecasts(path: str, modified_ns: int, identifier: str) -> pd.DataFrame:
+    """Lee únicamente estimaciones que ya fueron autorizadas por el pipeline."""
+    del modified_ns
+    data = pd.read_csv(path, parse_dates=["fecha"])
+    required = {"via", "fecha", "valor", "id_ejecucion", "tipo_valor", "modelo"}
+    missing = required.difference(data.columns)
+    if missing:
+        raise ValueError(f"Faltan columnas en estimaciones.csv: {sorted(missing)}")
+    if data.empty or not data["id_ejecucion"].eq(identifier).all():
+        raise ValueError("Las estimaciones no corresponden a la ejecución publicada.")
+    if not data["tipo_valor"].eq("estimado").all():
+        raise ValueError("El archivo contiene valores que no son estimaciones.")
+    if set(data["via"]) != set(VIAS):
+        raise ValueError("El archivo aprobado no contiene exactamente AEREA y TERRESTRE.")
+    if data.duplicated(["via", "fecha"]).any():
+        raise ValueError("Hay duplicados de vía y fecha en la versión aprobada.")
+    data["valor"] = pd.to_numeric(data["valor"], errors="raise")
+    if not np.isfinite(data["valor"].to_numpy()).all() or (data["valor"] < 0).any():
+        raise ValueError("Las estimaciones contienen valores negativos o no finitos.")
+    return data.sort_values(["via", "fecha"]).reset_index(drop=True)
+
+
+@st.cache_resource(show_spinner="Cargando modelos de la versión aprobada...")
+def load_models(model_specs: tuple[tuple[str, str, int], ...]) -> dict:
+    """Carga los modelos serializados de la misma versión que el CSV publicado.
+
+    NO se llaman .fit(), .predict() ni .forecast(): las cifras aprobadas vienen
+    del CSV publicado y no se recalculan al interactuar con el tablero.
+    """
+    return {via: joblib.load(path) for via, path, _ in model_specs}
+
+
+@st.cache_data(show_spinner="Leyendo métricas de validación...")
+def load_evaluation(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    data = pd.read_csv(path)
+    required = {"periodo", "observado", "estimacion", "referencia"}
+    if not required.issubset(data.columns):
+        raise ValueError(f"Reporte de evaluación incompleto: {path}")
+    data["Fecha"] = pd.to_datetime(data["periodo"], format="%Y-%m")
+    data["Error"] = pd.to_numeric(data["observado"]) - pd.to_numeric(data["estimacion"])
+    return data.sort_values("Fecha")
 
 
 def monthly_series(data: pd.DataFrame, via: str | None = None, foreign_only: bool = False) -> pd.Series:
@@ -82,57 +170,13 @@ def monthly_series(data: pd.DataFrame, via: str | None = None, foreign_only: boo
     if via:
         subset = subset[subset["Via"] == via]
     if foreign_only:
-        subset = subset[subset["Pais"] != "Guatemala"]
-    result = subset.groupby("Fecha")["Viajero"].sum().sort_index()
+        subset = subset[subset["Pais"] != "GUATEMALA"]
+    result = subset.groupby("Fecha")["Viajero"].sum(min_count=1).sort_index()
     if result.empty:
         return result
+    # Los meses sin cobertura son valores desconocidos, no ceros.
     index = pd.date_range(result.index.min(), result.index.max(), freq="MS")
-    return result.reindex(index, fill_value=0.0)
-
-
-@st.cache_data(show_spinner="Calculando pronosticos...")
-def model_forecast(model_name: str, final_date: pd.Timestamp, model_stamp: float) -> pd.DataFrame:
-    """Extiende un modelo guardado, sin ajustarlo nuevamente."""
-    del model_stamp
-    models = load_models(tuple((name, path.stat().st_mtime) for name, path in MODEL_PATHS.items()))
-    model = models[model_name]
-    info = MODEL_INFO[model_name]
-    dates = pd.date_range(info["corte"] + pd.offsets.MonthBegin(1), final_date, freq="MS")
-    steps = len(dates)
-
-    if model_name == "Maritima":
-        result = model.get_forecast(steps=steps)
-        interval = result.conf_int(alpha=0.05)
-        frame = pd.DataFrame({
-            "Fecha": dates,
-            "Pronostico": np.asarray(result.predicted_mean, dtype=float),
-            "Inferior": np.asarray(interval.iloc[:, 0], dtype=float),
-            "Superior": np.asarray(interval.iloc[:, 1], dtype=float),
-        })
-    elif model_name == "Aerea":
-        predicted = np.asarray(model.forecast(steps=steps), dtype=float)
-        sigma = float(np.std(np.asarray(model.resid, dtype=float), ddof=1))
-        uncertainty = 1.96 * sigma * np.sqrt(np.arange(1, steps + 1))
-        frame = pd.DataFrame({
-            "Fecha": dates,
-            "Pronostico": predicted,
-            "Inferior": predicted - uncertainty,
-            "Superior": predicted + uncertainty,
-        })
-    else:
-        # Prophet usa muestreo para los limites; la semilla hace estable el cache visual.
-        np.random.seed(42)
-        predicted = model.predict(pd.DataFrame({"ds": dates}))
-        frame = pd.DataFrame({
-            "Fecha": dates,
-            "Pronostico": predicted["yhat"].to_numpy(),
-            "Inferior": predicted["yhat_lower"].to_numpy(),
-            "Superior": predicted["yhat_upper"].to_numpy(),
-        })
-    frame[["Pronostico", "Inferior", "Superior"]] = frame[
-        ["Pronostico", "Inferior", "Superior"]
-    ].clip(lower=0)
-    return frame
+    return result.reindex(index)
 
 
 def chart_layout(fig: go.Figure, height: int = 350, percent_axis: bool = False) -> go.Figure:
@@ -243,25 +287,24 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-if not CSV_PATH.exists():
-    st.error("No se encontro DATOS_LIMPIOS.csv junto a app.py.")
-    st.stop()
-missing_models = [path.name for path in MODEL_PATHS.values() if not path.exists()]
-if missing_models:
-    st.error("Faltan modelos requeridos: " + ", ".join(missing_models))
+if not CSV_PATH.is_file():
+    st.error("No se encuentra datos/DATOS_LIMPIOS.csv. Ejecuta primero el pipeline normal.")
     st.stop()
 
 try:
-    df = load_data(str(CSV_PATH), CSV_PATH.stat().st_mtime)
+    df = load_data(str(CSV_PATH), CSV_PATH.stat().st_mtime_ns)
 except Exception as error:
-    st.error(f"No fue posible cargar los datos: {error}")
+    st.error(f"No fue posible leer los datos limpios: {error}")
     st.stop()
 
-# Normaliza nombres internos para evitar tildes en expresiones y mantener los textos originales al mostrar.
-df = df.rename(columns={"Via": "Via", "Vía": "Via", "Pais": "Pais", "País": "Pais"})
-if not {"Via", "Pais"}.issubset(df.columns):
-    st.error("El archivo no contiene las columnas Via y Pais esperadas.")
-    st.stop()
+# No usar las rutas absolutas guardadas por Windows en version_vigente.json:
+# se reconstruyen todas a partir de ROOT y del ID de la versión aprobada.
+try:
+    publicacion = verificar_version_publicada()
+    publicacion_error = None
+except (ValueError, FileNotFoundError, KeyError, OSError, json.JSONDecodeError) as error:
+    publicacion = None
+    publicacion_error = str(error)
 
 st.markdown(
     """
@@ -441,147 +484,183 @@ if "Origen y estacionalidad" in visible_groups:
 
 if "Modelos predictivos" in visible_groups:
     st.markdown("## Modelos predictivos")
-    st.caption("Resultados de tres modelos ya entrenados. Cada uno representa una via distinta; no se construyen modelos nuevos.")
-    model_col, horizon_col = st.columns([1.5, 1], vertical_alignment="bottom")
-    with model_col:
-        selected_model = st.radio(
-            "Modelo y via",
-            list(MODEL_INFO),
-            format_func=lambda name: f"{MODEL_INFO[name]['nombre']} · {name}",
+    if publicacion_error:
+        st.error(f"No se pudo consultar la versión publicada: {publicacion_error}")
+    elif publicacion is None:
+        st.info("Todavía no existe una versión aprobada. Las estimaciones no están disponibles.")
+    else:
+        version_id = publicacion["id"]
+        meta = publicacion["metadatos"]
+        try:
+            ruta_csv = publicacion["ruta_predicciones"]
+            forecasts = load_published_forecasts(
+                str(ruta_csv), ruta_csv.stat().st_mtime_ns, version_id
+            )
+            modelos_info = meta["modelos"]
+            if set(modelos_info) != set(VIAS):
+                raise ValueError("Los modelos publicados no coinciden con las dos vías autorizadas.")
+            model_specs = tuple(
+                (via, str(publicacion["carpeta_modelos"] / f"{via.lower()}.joblib"),
+                 (publicacion["carpeta_modelos"] / f"{via.lower()}.joblib").stat().st_mtime_ns)
+                for via in VIAS
+            )
+            modelos_cargados = load_models(model_specs)
+            if set(modelos_cargados) != set(VIAS):
+                raise ValueError("No se pudieron cargar todos los modelos aprobados.")
+        except Exception as error:
+            st.error(f"La versión aprobada no está completa o no se puede cargar: {error}")
+            st.stop()
+
+        fecha_pub = pd.to_datetime(
+            publicacion["puntero"].get("fecha_actualizacion"), utc=True, errors="coerce"
+        )
+        actualizacion = fecha_pub.strftime("%d/%m/%Y %H:%M UTC") if pd.notna(fecha_pub) else "No disponible"
+        st.caption(
+            f"Versión publicada: {version_id} · Actualización: {actualizacion} · "
+            f"Procedimiento: {meta.get('version_procedimiento', 'N/D')}"
+        )
+        st.caption(
+            "Se utilizan modelos guardados de esta misma ejecución; las cifras mostradas "
+            "son las estimaciones aprobadas por el pipeline. Cambiar los filtros no vuelve a entrenar ni pronosticar."
+        )
+        selected_via = st.radio(
+            "Modelo y vía",
+            list(VIAS),
+            format_func=lambda via: f"{modelos_info[via]['tipo']} · {VIAS[via]}",
             horizontal=True,
         )
-    with horizon_col:
-        forecast_horizon = st.slider("Horizonte visible", 6, 24, 24, 6, format="%d meses")
 
-    latest_date = df["Fecha"].max()
-    final_date = latest_date + pd.offsets.MonthBegin(forecast_horizon)
-    try:
-        forecasts = {
-            name: model_forecast(name, final_date, MODEL_PATHS[name].stat().st_mtime)
-            for name in MODEL_INFO
-        }
-    except Exception as error:
-        st.error(f"No fue posible generar los pronosticos guardados: {error}")
-        st.stop()
+        modelo_seleccionado = modelos_info[selected_via]
+        futuro = forecasts.loc[forecasts["via"] == selected_via]
+        observado = monthly_series(df, via=selected_via, foreign_only=True)
+        ultimo_observado = observado.index.max()
+        historico = observado[observado.index >= ultimo_observado - pd.DateOffset(months=35)]
 
-    info = MODEL_INFO[selected_model]
-    model_series = monthly_series(df, via=info["via"], foreign_only=True)
-    selected_forecast = forecasts[selected_model]
-    future = selected_forecast[selected_forecast["Fecha"] > latest_date].head(forecast_horizon)
-    recent_actual = model_series[model_series.index >= latest_date - pd.DateOffset(months=35)]
-
-    section_title(7, "Proyeccion de visitantes", f"{info['nombre']} para via {selected_model.lower()}; siguientes {forecast_horizon} meses.")
-    projection_fig = go.Figure()
-    projection_fig.add_trace(go.Scatter(
-        x=future["Fecha"], y=future["Superior"], mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip",
-    ))
-    projection_fig.add_trace(go.Scatter(
-        x=future["Fecha"], y=future["Inferior"], mode="lines", line=dict(width=0), fill="tonexty",
-        fillcolor="rgba(25,167,160,.16)", name=f"Intervalo {info['intervalo']}", hoverinfo="skip",
-    ))
-    projection_fig.add_trace(go.Scatter(
-        x=recent_actual.index, y=recent_actual.values, mode="lines", name="Observado",
-        line=dict(color=PETROLEO, width=2.5), hovertemplate="%{x|%b %Y}<br>Observado: <b>%{y:,.0f}</b><extra></extra>",
-    ))
-    projection_fig.add_trace(go.Scatter(
-        x=future["Fecha"], y=future["Pronostico"], mode="lines+markers", name="Pronostico",
-        line=dict(color=CORAL, width=2.5, dash="dash"), marker=dict(size=5),
-        hovertemplate="%{x|%b %Y}<br>Estimacion: <b>%{y:,.0f}</b><extra></extra>",
-    ))
-    projection_fig.add_vline(x=latest_date.timestamp() * 1000, line_dash="dot", line_color=TEXTO_SUAVE)
-    chart_layout(projection_fig, 420).update_yaxes(title="Visitantes extranjeros")
-    st.plotly_chart(projection_fig, width="stretch", config=plot_config)
-    months_from_cut = (latest_date.year - info["corte"].year) * 12 + latest_date.month - info["corte"].month
-    st.markdown(
-        f"<div class='note'><b>Como leerlo:</b> la linea coral es una estimacion, no un dato observado. "
-        f"El modelo fue entrenado hasta {info['corte']:%b %Y}; el primer mes futuro mostrado esta a "
-        f"{months_from_cut + 1} pasos de ese corte, por lo que la incertidumbre aumenta con el horizonte.</div>",
-        unsafe_allow_html=True,
-    )
-
-    metrics = []
-    validation_frames = {}
-    for name, model_info in MODEL_INFO.items():
-        actual = monthly_series(df, via=model_info["via"], foreign_only=True)
-        predicted = forecasts[name]
-        validation = predicted[predicted["Fecha"].isin(actual.index) & (predicted["Fecha"] <= latest_date)].copy()
-        validation["Observado"] = validation["Fecha"].map(actual)
-        validation["Error"] = validation["Observado"] - validation["Pronostico"]
-        validation = validation.dropna(subset=["Observado", "Pronostico"])
-        mae = validation["Error"].abs().mean()
-        rmse = np.sqrt(np.mean(validation["Error"] ** 2))
-        relative_mae = mae / validation["Observado"].mean() * 100 if validation["Observado"].mean() else np.nan
-        metrics.append({
-            "Modelo": model_info["nombre"], "Via": name, "MAE": mae, "RMSE": rmse,
-            "MAE relativo": relative_mae, "Meses": len(validation), "Corte": model_info["corte"],
-        })
-        validation_frames[name] = validation
-    metrics_df = pd.DataFrame(metrics)
-
-    performance_col, error_col = st.columns(2)
-    with performance_col:
-        section_title(8, "Desempeño de los tres modelos", "MAE relativo: error absoluto medio como porcentaje del promedio observado.")
-        performance_fig = px.bar(
-            metrics_df, x="Modelo", y="MAE relativo", color="Via", barmode="group",
-            color_discrete_map={"Aerea": PETROLEO, "Maritima": "#7B9A98", "Terrestre": TURQUESA},
-            text_auto=".1f",
-            custom_data=["Via", "MAE", "RMSE", "Meses"],
+        section_title(
+            7, "Proyección de visitantes",
+            f"{modelo_seleccionado['tipo']} · vía {VIAS[selected_via]} · "
+            f"{len(futuro)} meses aprobados para publicación",
         )
-        performance_fig.update_traces(
-            hovertemplate="%{x} · %{customdata[0]}<br>MAE relativo: <b>%{y:.1f}%</b><br>MAE: %{customdata[1]:,.0f}<br>RMSE: %{customdata[2]:,.0f}<br>Meses: %{customdata[3]}<extra></extra>"
-        )
-        chart_layout(performance_fig, 390, percent_axis=True)
-        performance_fig.update_xaxes(title=None)
-        performance_fig.update_yaxes(title="MAE relativo")
-        st.plotly_chart(performance_fig, width="stretch", config=plot_config)
-
-    with error_col:
-        section_title(9, "Error a traves del tiempo", f"Diferencia observado menos estimado para {info['nombre']}.")
-        validation = validation_frames[selected_model]
-        error_fig = go.Figure(go.Bar(
-            x=validation["Fecha"], y=validation["Error"],
-            marker_color=np.where(validation["Error"] < 0, CORAL, TURQUESA),
-            hovertemplate="%{x|%b %Y}<br>Error: <b>%{y:,.0f}</b><extra></extra>",
+        projection_fig = go.Figure()
+        projection_fig.add_trace(go.Scatter(
+            x=historico.index, y=historico.values, mode="lines+markers", name="Observado",
+            line=dict(color=PETROLEO, width=2.5), marker=dict(size=4),
+            hovertemplate="%{x|%b %Y}<br>Observado: <b>%{y:,.0f}</b><extra></extra>",
         ))
-        error_fig.add_hline(y=0, line_color=PETROLEO, line_width=1)
-        chart_layout(error_fig, 390).update_layout(showlegend=False)
-        error_fig.update_yaxes(title="Error (visitantes)", rangemode="normal")
-        st.plotly_chart(error_fig, width="stretch", config=plot_config)
+        projection_fig.add_trace(go.Scatter(
+            x=futuro["fecha"], y=futuro["valor"], mode="lines+markers", name="Estimado (aprobado)",
+            line=dict(color=CORAL, width=2.5, dash="dash"), marker=dict(size=7),
+            hovertemplate="%{x|%b %Y}<br>Estimación aprobada: <b>%{y:,.0f}</b><extra></extra>",
+        ))
+        chart_layout(projection_fig, 420).update_yaxes(title="Visitantes internacionales")
+        st.plotly_chart(projection_fig, width="stretch", config=plot_config)
 
-    display_metrics = metrics_df.copy()
-    display_metrics["Corte"] = display_metrics["Corte"].dt.strftime("%b %Y")
-    display_metrics["MAE"] = display_metrics["MAE"].round(0)
-    display_metrics["RMSE"] = display_metrics["RMSE"].round(0)
-    display_metrics["MAE relativo"] = display_metrics["MAE relativo"].map(lambda value: f"{value:.1f}%")
-    st.dataframe(
-        display_metrics[["Modelo", "Via", "Corte", "Meses", "MAE", "RMSE", "MAE relativo"]],
-        width="stretch",
-        hide_index=True,
-        column_config={
-            "MAE": st.column_config.NumberColumn(format="%,.0f"),
-            "RMSE": st.column_config.NumberColumn(format="%,.0f"),
-        },
-    )
-    st.caption(
-        "MAE es el error promedio en visitantes; RMSE penaliza mas los errores grandes. "
-        "Los modelos representan escalas y vias diferentes, por eso el MAE relativo es la comparacion mas util."
-    )
+        st.markdown(
+            "<div class='note'><b>Interpretación:</b> la línea oscura representa registros observados; "
+            "la línea coral muestra únicamente los meses estimados y aprobados. "
+            "No se muestran intervalos de confianza porque el pipeline actual no los publica.</div>",
+            unsafe_allow_html=True,
+        )
 
-st.markdown("## Metodologia, alcance y limitaciones")
+        st.markdown("#### Evaluación de los modelos publicados")
+        filas_metricas = []
+        evaluaciones = {}
+        for via, etiqueta in VIAS.items():
+            item = modelos_info[via]
+            metricas = item["metricas"]
+            path_eval = REPORTES_DIR / version_id / f"evaluacion_{via.lower()}.csv"
+            eval_df = None
+            if path_eval.is_file():
+                try:
+                    eval_df = load_evaluation(str(path_eval), path_eval.stat().st_mtime_ns)
+                    evaluaciones[via] = eval_df
+                except (ValueError, OSError) as error:
+                    st.warning(f"No se pudo consultar la evaluación de {etiqueta}: {error}")
+
+            promedio = eval_df["observado"].mean() if eval_df is not None else np.nan
+            mae = float(metricas["mae_modelo"])
+            rmse = float(np.sqrt(np.mean(eval_df["Error"].to_numpy() ** 2))) if eval_df is not None else np.nan
+            mae_relativo = mae / promedio * 100 if np.isfinite(promedio) and promedio > 0 else np.nan
+            filas_metricas.append({
+                "Modelo": item["tipo"], "Vía": etiqueta, "Código": via,
+                "MAE": mae, "MAE referencia": float(metricas["mae_referencia"]),
+                "RMSE": rmse, "MAE relativo": mae_relativo,
+                "Meses": len(item.get("meses_evaluados", [])),
+                "Período evaluado": ", ".join(item.get("meses_evaluados", [])[::11])
+                if item.get("meses_evaluados") else "N/D",
+            })
+        metrics_df = pd.DataFrame(filas_metricas)
+
+        performance_col, error_col = st.columns(2)
+        with performance_col:
+            section_title(8, "Desempeño de los dos modelos", "MAE del procedimiento frente a la referencia histórica.")
+            performance_long = metrics_df.melt(
+                id_vars=["Vía"], value_vars=["MAE", "MAE referencia"],
+                var_name="Procedimiento", value_name="Error absoluto medio",
+            )
+            performance_fig = px.bar(
+                performance_long, x="Vía", y="Error absoluto medio", color="Procedimiento",
+                barmode="group", color_discrete_map={"MAE": PETROLEO, "MAE referencia": TURQUESA},
+                text_auto=",.0f",
+            )
+            chart_layout(performance_fig, 390)
+            performance_fig.update_xaxes(title=None)
+            performance_fig.update_yaxes(title="MAE (visitantes)")
+            st.plotly_chart(performance_fig, width="stretch", config=plot_config)
+
+        with error_col:
+            section_title(9, "Error a través del tiempo", f"Observado menos estimado · {VIAS[selected_via]}.")
+            if selected_via in evaluaciones:
+                eval_df = evaluaciones[selected_via]
+                error_fig = go.Figure(go.Bar(
+                    x=eval_df["Fecha"], y=eval_df["Error"],
+                    marker_color=np.where(eval_df["Error"] < 0, CORAL, TURQUESA),
+                    hovertemplate="%{x|%b %Y}<br>Error: <b>%{y:,.0f}</b><extra></extra>",
+                ))
+                error_fig.add_hline(y=0, line_color=PETROLEO, line_width=1)
+                chart_layout(error_fig, 390).update_layout(showlegend=False)
+                error_fig.update_yaxes(title="Error (visitantes)", rangemode="normal")
+                st.plotly_chart(error_fig, width="stretch", config=plot_config)
+            else:
+                st.info("El reporte temporal de esta ejecución no está disponible en reportes/.")
+
+        display_metrics = metrics_df.drop(columns="Código").copy()
+        st.dataframe(
+            display_metrics,
+            width="stretch", hide_index=True,
+            column_config={
+                "MAE": st.column_config.NumberColumn(format="%,.0f"),
+                "MAE referencia": st.column_config.NumberColumn(format="%,.0f"),
+                "RMSE": st.column_config.NumberColumn(format="%,.0f"),
+                "MAE relativo": st.column_config.NumberColumn(format="%.1f%%"),
+            },
+        )
+        meses_prueba = modelo_seleccionado.get("meses_evaluados", [])
+        periodo_prueba = (
+            f"{meses_prueba[0]} a {meses_prueba[-1]}" if meses_prueba else "período no disponible"
+        )
+        st.caption(
+            f"El MAE indica el error absoluto promedio en visitantes; se evaluó sobre {periodo_prueba}. "
+            "El MAE de referencia corresponde al método histórico sencillo del pipeline. "
+            "La comparación se realiza sobre los mismos meses observados; no es una evaluación del pronóstico futuro."
+        )
+
+st.markdown("## Metodología, alcance y limitaciones")
 st.markdown(
     """
-    **Fuente y alcance.** Registros mensuales de INGUAT entre enero de 2009 y junio de 2026. Los indicadores
-    descriptivos incluyen turistas y excursionistas. Los rankings y modelos excluyen residentes de Guatemala
-    para aproximar llegadas internacionales.
+    **Fuente y alcance.** Registros mensuales del observatorio, de acuerdo con la cobertura de
+    `datos/DATOS_LIMPIOS.csv`. Las visualizaciones se limitan a vías aérea y terrestre y a
+    turistas y excursionistas internacionales, según los filtros del pipeline.
 
-    **Interaccion.** El selector anual actualiza las tarjetas, paises y vias. El nivel de detalle modifica la
-    ventana historica. Seleccionar un punto del historico actualiza el desglose mensual por via. Tambien se pueden
-    ocultar grupos completos de visualizaciones y cambiar el modelo u horizonte del pronostico.
+    **Interacción.** Los filtros modifican únicamente la presentación. El tablero consulta
+    la última versión vigente y aprobada, indicada en `resultados/version_vigente.json`,
+    incluidos los casos de restauración de versiones anteriores.
 
-    **Limitaciones.** Los datos describen asociaciones, no causas. Los años 2020-2022 se excluyen solamente del
-    promedio estacional por ser atipicos. Los tres modelos tienen cortes distintos, no usan informacion posterior
-    al entrenamiento y sus proyecciones lejanas deben interpretarse como escenarios orientativos. Holt-Winters
-    utiliza una banda aproximada del 95%, SARIMAX una banda del 95% y Prophet su intervalo configurado del 80%.
+    **Limitaciones.** La ausencia de cobertura no equivale a cero. El ajuste excepcional
+    de la pandemia se realiza dentro del pipeline, no en las visualizaciones.
+    Los pronósticos no son observaciones y pueden diferir de los resultados reales.
+    La aplicación no extiende el horizonte aprobado ni calcula intervalos de confianza
+    no publicados; los detalles técnicos e hiperparámetros se conservan en MLflow.
     """
 )
 
