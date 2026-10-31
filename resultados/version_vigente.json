@@ -1,8 +1,8 @@
 {
   "id_ejecucion": "20261031T125220Z_8fa59a93",
   "mlflow_run_id": "651ba6ffbe7646ffbb899b57962113fe",
-  "ruta_estimaciones": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\resultados\\aprobados\\20261031T125220Z_8fa59a93\\estimaciones.csv",
-  "ruta_metadatos": "C:\\Users\\ricro\\OneDrive\\Desktop\\Carrera Mate\\6to Semestre\\DATA SCIENCE\\LABORATORIO_11\\LABORATORIO_11_DS\\resultados\\aprobados\\20261031T125220Z_8fa59a93\\metadatos.json",
-  "fecha_actualizacion": "2026-10-31T12:52:32+00:00",
-  "accion": "publicacion"
+  "ruta_estimaciones": "aprobados/20261031T125220Z_8fa59a93/estimaciones.csv",
+  "ruta_metadatos": "aprobados/20261031T125220Z_8fa59a93/metadatos.json",
+  "fecha_actualizacion": "2026-10-31T21:20:42+00:00",
+  "accion": "restauracion"
 }

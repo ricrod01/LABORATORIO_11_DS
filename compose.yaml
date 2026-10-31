@@ -1,0 +1,78 @@
+services:
+  mlflow:
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    command:
+      - mlflow
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --artifacts-destination
+      - /mlflow/artifacts
+      - --serve-artifacts
+    environment:
+      MLFLOW_SERVER_ALLOWED_HOSTS: mlflow,localhost,127.0.0.1
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    command:
+      - streamlit
+      - run
+      - /app/app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+      - --server.headless=true
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./datos:/app/datos:ro
+      - ./resultados:/app/resultados:ro
+      - ./modelos_guardados:/app/modelos_guardados:ro
+      - ./reportes:/app/reportes:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  pipeline:
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    command: ["python", "/app/scripts/pipeline.py", "--config", "/app/scripts/config.yaml"]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./datos:/app/datos
+      - ./resultados:/app/resultados
+      - ./modelos_guardados:/app/modelos_guardados
+      - ./reportes:/app/reportes
+      - ./logs:/app/logs
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    profiles: ["tools"]
+
+volumes:
+  mlflow-data:

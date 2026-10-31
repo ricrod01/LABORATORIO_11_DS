@@ -1,9 +1,9 @@
 """Laboratorio 11 - orquestador reproducible, trazable y con publicación controlada.
 
 Ejecutar desde el directorio del proyecto:
-    python pipeline.py --config config.yaml
-    python pipeline.py --config config.yaml --restaurar ID_APROBADO
-    python pipeline.py --config config.yaml --comparar ID_1 ID_2
+    python scripts/pipeline.py --config scripts/config.yaml
+    python scripts/pipeline.py --config scripts/config.yaml --restaurar ID_APROBADO
+    python scripts/pipeline.py --config scripts/config.yaml --comparar ID_1 ID_2
 
 No modifica las fuentes institucionales y no publica resultados sin aprobación.
 """
@@ -83,7 +83,7 @@ def git_commit(carpeta):
             stderr=subprocess.DEVNULL, text=True, timeout=5
         ).strip()
     except (OSError, subprocess.SubprocessError):
-        return None
+        return os.getenv('GIT_COMMIT')
 
 
 def git_modificaciones(carpeta):
@@ -97,9 +97,15 @@ def git_modificaciones(carpeta):
 
 
 def huellas_codigo(carpeta):
-    nombres = ['pipeline.py', 'funciones_limpieza.py', 'controles.py', 'ajustes_modelos.py']
-    return {nombre: hash_archivo(Path(carpeta) / nombre) for nombre in nombres
-            if (Path(carpeta) / nombre).is_file()}
+    carpeta = Path(carpeta)
+    archivos = {
+        'pipeline.py': carpeta / 'pipeline.py',
+        'funciones_limpieza.py': carpeta / 'funciones_limpieza.py',
+        'controles.py': carpeta / 'controles.py',
+        'ajustes_modelos.py': carpeta / 'ajustes_modelos.py',
+        'app.py': carpeta.parent / 'app.py',
+    }
+    return {nombre: hash_archivo(ruta) for nombre, ruta in archivos.items() if ruta.is_file()}
 
 
 def leer_config(ruta_config):
@@ -156,7 +162,7 @@ def etapa(informe, logger, nombre, funcion):
 
 def informacion_dependencias():
     paquetes = ['pandas', 'numpy', 'scikit-learn', 'statsmodels', 'prophet',
-                'sktime', 'mlflow', 'PyYAML', 'joblib']
+                 'sktime', 'mlflow', 'PyYAML', 'joblib', 'streamlit', 'plotly']
     resultado = {'python': platform.python_version(), 'sistema': platform.platform()}
     for paquete in paquetes:
         try:
@@ -310,55 +316,176 @@ def leer_version_vigente(config):
     return version
 
 
-def monitorear(predicciones, limpio, config, informe):
+def rutas_version_aprobada(config, identificador):
+    """Resuelve una version desde la configuracion, no desde rutas de otra maquina."""
+    carpeta = Path(config['rutas']['resultados_aprobados']) / identificador
+    return carpeta / 'estimaciones.csv', carpeta / 'metadatos.json'
+
+
+def ruta_para_puntero(config, ruta):
+    """Evita guardar rutas absolutas que dejan de servir en otra computadora."""
+    base = Path(config['rutas']['version_vigente']).parent.resolve()
+    ruta = Path(ruta).resolve()
+    try:
+        return ruta.relative_to(base).as_posix()
+    except ValueError:
+        return str(ruta)
+
+
+def monitorear(predicciones, limpio, config, informe, mlflow=None, logger=None):
+    """Monitorea actualizacion, calidad y resultados sin rechazar por variacion."""
     alertas = []
     umbrales = config['monitoreo']
     cobertura = config['controles']['final']['cobertura']
+    verificaciones = {}
+
+    # Actualizacion de la fuente.
     fin_esperado = cobertura.get('fecha_fin')
     fin_observado = limpio['fecha'].max().to_period('M')
     if fin_esperado is None:
-        alertas.append('No se configuró fecha_fin de cobertura: no es posible verificar actualización contra el período esperado')
-    elif fin_observado < pd.Period(fin_esperado, freq='M'):
-        alertas.append(f'Fuente desactualizada: último período {fin_observado}; se esperaba {fin_esperado}')
+        mensaje = 'No se configuro fecha_fin: no es posible verificar la actualizacion de la fuente'
+        alertas.append(mensaje)
+        estado_fuente = 'ALERTA'
+    else:
+        esperado = pd.Period(fin_esperado, freq='M')
+        estado_fuente = 'OK' if fin_observado >= esperado else 'ALERTA'
+        if estado_fuente == 'ALERTA' and umbrales.get('alertar_actualizacion_atrasada', True):
+            alertas.append(f'Fuente desactualizada: ultimo periodo {fin_observado}; se esperaba {esperado}')
 
+    pronostico = config['modelos']['pronostico']
+    inicio_salida = (pd.Period(pronostico['fecha_inicio'], freq='M')
+                     if pronostico.get('fecha_inicio') else fin_observado + 1)
+    fin_salida_esperado = inicio_salida + int(pronostico['horizonte_meses']) - 1
+    maximos_salida = {
+        via: grupo['fecha'].max().to_period('M')
+        for via, grupo in predicciones.groupby('via')
+    }
+    salidas_atrasadas = {
+        via: str(periodo) for via, periodo in maximos_salida.items()
+        if periodo < fin_salida_esperado
+    }
+    vias_sin_salida = sorted(set(config['modelos']['vias']) - set(maximos_salida))
+    if salidas_atrasadas or vias_sin_salida:
+        alertas.append(
+            f'Resultados desactualizados; fin esperado {fin_salida_esperado}, '
+            f'vias atrasadas {salidas_atrasadas}, vias ausentes {vias_sin_salida}'
+        )
+    verificaciones['actualizacion'] = {
+        'estado': ('OK' if estado_fuente == 'OK' and not salidas_atrasadas
+                   and not vias_sin_salida else 'ALERTA'),
+        'ultimo_periodo_fuente': str(fin_observado),
+        'periodo_fuente_esperado': str(fin_esperado) if fin_esperado else None,
+        'ultimo_periodo_resultados': {k: str(v) for k, v in maximos_salida.items()},
+        'periodo_resultados_esperado': str(fin_salida_esperado),
+    }
+
+    # Calidad de los datos y cambio frente a la version vigente.
     final = informe['controles']['final']['detalle']
     duplicados = int(final.get('duplicados', 0))
     nulos = sum(v for k, v in final.items() if k.startswith('nulos_') and isinstance(v, int))
+    faltan = sum(v.get('faltantes_criticos', 0) for k, v in final.items()
+                 if k.startswith('cobertura_') and isinstance(v, dict))
     if duplicados > umbrales['umbral_duplicados']:
         alertas.append(f'Calidad: duplicados {duplicados} exceden el umbral')
     if nulos > umbrales['umbral_faltantes_criticos']:
         alertas.append(f'Calidad: valores faltantes {nulos} exceden el umbral')
-    variacion = umbrales.get('variacion_relativa_maxima')
-    if variacion is None:
-        alertas.append('No se configuró variacion_relativa_maxima; monitoreo de cambios deshabilitado')
-    else:
-        for via, grupo in predicciones.sort_values('fecha').groupby('via'):
-            valores = grupo['estimacion'].astype(float).to_numpy()
-            if len(valores) > 1:
-                cambios = np.abs(np.diff(valores)) / np.maximum(np.abs(valores[:-1]), 1)
-                if np.any(cambios > variacion):
-                    alertas.append(f'{via}: cambio mensual de {float(cambios.max()):.2%} supera {variacion:.2%}')
+
+    calidad_anterior = None
     anterior = leer_version_vigente(config)
     if anterior:
-        metadatos = Path(anterior['ruta_metadatos'])
+        _, metadatos = rutas_version_aprobada(config, anterior['id_ejecucion'])
         if metadatos.is_file():
             with metadatos.open(encoding='utf-8') as archivo:
                 anterior_info = json.load(archivo)
-            anterior_calidad = anterior_info.get('calidad', {})
-            if duplicados > anterior_calidad.get('duplicados', duplicados):
+            calidad_anterior = anterior_info.get('calidad', {})
+            if duplicados > calidad_anterior.get('duplicados', duplicados):
                 alertas.append('Calidad: aumentaron los duplicados frente a la versión vigente')
-            if nulos > anterior_calidad.get('nulos', nulos):
+            if nulos > calidad_anterior.get('nulos', nulos):
                 alertas.append('Calidad: aumentaron los faltantes frente a la versión vigente')
-            prev_cobertura = anterior_calidad.get('faltantes_cobertura', 0)
-            faltan = sum(v.get('faltantes_criticos', 0) for k, v in final.items()
-                         if k.startswith('cobertura_') and isinstance(v, dict))
+            prev_cobertura = calidad_anterior.get('faltantes_cobertura', 0)
             if faltan > prev_cobertura:
                 alertas.append('Calidad: se redujo la cobertura frente a la versión vigente')
-    informe['monitoreo'] = {'alertas': alertas, 'ultimo_mes_observado': str(fin_observado)}
+
+    verificaciones['calidad'] = {
+        'estado': ('OK' if duplicados <= umbrales['umbral_duplicados']
+                   and nulos <= umbrales['umbral_faltantes_criticos'] and faltan == 0
+                   else 'ALERTA'),
+        'duplicados': duplicados,
+        'faltantes': nulos,
+        'periodos_sin_cobertura': faltan,
+        'calidad_version_anterior': calidad_anterior,
+    }
+
+    # Resultados: integridad y variaciones mensuales o frente a la version vigente.
+    valores = pd.to_numeric(predicciones['estimacion'], errors='coerce').to_numpy(dtype=float)
+    invalidas = int((~np.isfinite(valores) | (valores < 0)).sum())
+    variacion = float(umbrales['variacion_relativa_maxima'])
+    variacion_mensual_maxima = 0.0
+    for via, grupo in predicciones.sort_values('fecha').groupby('via'):
+        serie = grupo['estimacion'].astype(float).to_numpy()
+        if len(serie) > 1:
+            cambios = np.abs(np.diff(serie)) / np.maximum(np.abs(serie[:-1]), 1)
+            maximo = float(cambios.max())
+            variacion_mensual_maxima = max(variacion_mensual_maxima, maximo)
+            if maximo > variacion:
+                alertas.append(
+                    f'{via}: cambio mensual de {maximo:.2%} supera {variacion:.2%}; requiere revision'
+                )
+
+    variacion_version_anterior = None
+    if anterior:
+        estimaciones_anteriores, _ = rutas_version_aprobada(config, anterior['id_ejecucion'])
+        if estimaciones_anteriores.is_file():
+            previas = pd.read_csv(estimaciones_anteriores, usecols=['via', 'fecha', 'estimacion'])
+            previas['fecha'] = pd.to_datetime(previas['fecha'], errors='coerce')
+            comparacion = predicciones[['via', 'fecha', 'estimacion']].merge(
+                previas, on=['via', 'fecha'], suffixes=('_actual', '_anterior')
+            )
+            if not comparacion.empty:
+                cambios = (
+                    (comparacion['estimacion_actual'] - comparacion['estimacion_anterior']).abs()
+                    / comparacion['estimacion_anterior'].abs().clip(lower=1)
+                )
+                variacion_version_anterior = float(cambios.max())
+                if variacion_version_anterior > variacion:
+                    alertas.append(
+                        'Resultados: variacion frente a la version vigente de '
+                        f'{variacion_version_anterior:.2%} supera {variacion:.2%}; requiere revision'
+                    )
+
+    verificaciones['resultados'] = {
+        'estado': 'ERROR' if invalidas else ('ALERTA' if variacion_mensual_maxima > variacion
+                                             or (variacion_version_anterior or 0) > variacion else 'OK'),
+        'estimaciones_negativas_o_no_finitas': invalidas,
+        'variacion_mensual_maxima': variacion_mensual_maxima,
+        'variacion_maxima_version_anterior': variacion_version_anterior,
+        'umbral_variacion': variacion,
+        'nota': 'Una variacion elevada requiere revision; por si sola no prueba perdida de precision.',
+    }
+    if invalidas:
+        alertas.append(f'Resultados: {invalidas} estimaciones negativas o no finitas')
+
+    meses_evaluados = sorted({mes for modelo in informe['modelos'].values()
+                              for mes in modelo.get('meses_evaluados', [])})
+    informe['monitoreo'] = {
+        'verificaciones': verificaciones,
+        'alertas': alertas,
+        'error_predictivo_actualizado': bool(meses_evaluados),
+        'periodos_con_observaciones_comparables': meses_evaluados,
+    }
     informe['advertencias'].extend(alertas)
-    return {'duplicados': duplicados, 'nulos': nulos,
-            'faltantes_cobertura': sum(v.get('faltantes_criticos', 0) for k, v in final.items()
-                                      if k.startswith('cobertura_') and isinstance(v, dict))}
+    if logger:
+        for alerta in alertas:
+            logger.warning('Monitoreo | %s', alerta)
+    if mlflow:
+        mlflow.log_metrics({
+            'monitoreo_duplicados': duplicados,
+            'monitoreo_faltantes': nulos,
+            'monitoreo_faltantes_cobertura': faltan,
+            'monitoreo_variacion_mensual_maxima': variacion_mensual_maxima,
+            'monitoreo_alertas': len(alertas),
+        })
+    return {'duplicados': duplicados, 'nulos': nulos, 'faltantes_cobertura': faltan}
 
 
 def decidir_aceptacion(config, informe, salida, control_salida):
@@ -418,8 +545,8 @@ def publicar_version(config, informe, ruta_candidata, calidad, mlflow, logger):
         guardar_json(metadatos, carpeta_temporal / 'metadatos.json')
         carpeta_temporal.replace(carpeta_final)
         puntero = {'id_ejecucion': informe['id_ejecucion'], 'mlflow_run_id': informe['mlflow_run_id'],
-                   'ruta_estimaciones': str(carpeta_final / 'estimaciones.csv'),
-                   'ruta_metadatos': str(carpeta_final / 'metadatos.json'),
+                    'ruta_estimaciones': ruta_para_puntero(config, carpeta_final / 'estimaciones.csv'),
+                    'ruta_metadatos': ruta_para_puntero(config, carpeta_final / 'metadatos.json'),
                    'fecha_actualizacion': ahora(), 'accion': 'publicacion'}
         anterior = leer_version_vigente(config)
         guardar_json(puntero, config['rutas']['version_vigente'])
@@ -440,17 +567,33 @@ def publicar_version(config, informe, ruta_candidata, calidad, mlflow, logger):
 
 
 def restaurar(config, identificador):
-    """Restaura una versión aprobada sin borrar las versiones posteriores."""
-    carpeta = Path(config['rutas']['resultados_aprobados']) / identificador
-    datos, metadatos = carpeta / 'estimaciones.csv', carpeta / 'metadatos.json'
+    """Restaura una version integra y aprobada sin borrar versiones posteriores."""
+    inicio = ahora()
+    datos, metadatos = rutas_version_aprobada(config, identificador)
     if not datos.is_file() or not metadatos.is_file():
         raise FileNotFoundError('Versión aprobada no encontrada: ' + identificador)
     with metadatos.open(encoding='utf-8') as archivo:
         meta = json.load(archivo)
     if meta.get('id_ejecucion') != identificador or hash_archivo(datos) != meta.get('sha256_estimaciones'):
         raise ValueError('La versión solicitada no supera la comprobación de integridad')
+    if not meta.get('aceptacion', {}).get('aprobado', False):
+        raise ValueError('La versión solicitada no consta como aprobada')
+    estimaciones = pd.read_csv(datos, parse_dates=['fecha'])
+    control = validacion_estimaciones(estimaciones, config)
+    if not control['aprobado']:
+        raise ValueError('La versión solicitada ya no supera los controles de salida: '
+                         + '; '.join(control['errores']))
+    modelos_faltantes = []
+    for via in config['modelos']['vias']:
+        clave = via.lower().replace(' ', '_')
+        ruta_modelo = Path(config['rutas']['modelos']) / identificador / f'{clave}.joblib'
+        if not ruta_modelo.is_file():
+            modelos_faltantes.append(str(ruta_modelo))
+    if modelos_faltantes:
+        raise FileNotFoundError(f'Faltan modelos de la version que consume el tablero: {modelos_faltantes}')
     puntero = {'id_ejecucion': identificador, 'mlflow_run_id': meta['mlflow_run_id'],
-               'ruta_estimaciones': str(datos), 'ruta_metadatos': str(metadatos),
+                'ruta_estimaciones': ruta_para_puntero(config, datos),
+                'ruta_metadatos': ruta_para_puntero(config, metadatos),
                'fecha_actualizacion': ahora(), 'accion': 'restauracion'}
     anterior = leer_version_vigente(config)
     guardar_json(puntero, config['rutas']['version_vigente'])
@@ -460,6 +603,17 @@ def restaurar(config, identificador):
                                    'version_vigente': identificador})
     except OSError as exc:
         print(f'ADVERTENCIA: no se pudo guardar auditoría de restauración: {exc}', file=sys.stderr)
+    evidencia = {
+        'accion': 'restauracion', 'inicio': inicio, 'fin': ahora(), 'estado': 'completada',
+        'version_anterior': anterior['id_ejecucion'] if anterior else None,
+        'version_restaurada': identificador, 'integridad_sha256': True,
+        'aceptacion_verificada': True, 'control_estimaciones': control,
+        'modelos_verificados': len(config['modelos']['vias']),
+        'tablero_consultable': True,
+        'detalle_tablero': 'El puntero, estimaciones, metadatos y modelos requeridos estan disponibles.'
+    }
+    carpeta_evidencia = Path(config['rutas']['reportes']) / 'restauraciones'
+    guardar_json(evidencia, carpeta_evidencia / f'restauracion_{id_ejecucion()}.json')
     return puntero
 
 
@@ -552,9 +706,12 @@ def ejecutar(config, ruta_config):
                 guardar_datos(salida, ruta_candidata)
                 informe['archivos']['estimaciones_candidatas'] = str(ruta_candidata)
                 control_salida = validacion_estimaciones(salida, config)
+                calidad = etapa(
+                    informe, logger, 'monitoreo',
+                    lambda: monitorear(pred, limpio, config, informe, mlflow, logger)
+                )
+                guardar_json(informe['monitoreo'], carpeta / 'monitoreo.json')
                 registrar_control('estimaciones', control_salida, informe, mlflow, logger)
-                calidad = etapa(informe, logger, 'monitoreo',
-                                lambda: monitorear(pred, limpio, config, informe))
                 informe['aceptacion'] = decidir_aceptacion(config, informe, salida, control_salida)
                 guardar_json(informe['aceptacion'], carpeta / 'aceptacion.json')
                 mlflow.log_metric('version_aceptada', int(informe['aceptacion']['aprobado']))
@@ -579,6 +736,11 @@ def ejecutar(config, ruta_config):
                 mlflow.set_tag('publicacion', 'no_publicado')
             finally:
                 informe['fin'] = ahora()
+                logger.info(
+                    'Fin de ejecucion: %s | estado=%s | publicacion=%s | advertencias=%s | errores=%s',
+                    identificador, informe['estado'], informe['publicacion'],
+                    len(informe['advertencias']), len(informe['errores'])
+                )
                 guardar_json(informe, carpeta / 'ejecucion.json')
                 shutil.copy2(ruta_config, carpeta / 'config_ejecutada.yaml')
                 guardar_json(informe['dependencias'], carpeta / 'dependencias.json')

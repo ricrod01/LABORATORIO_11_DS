@@ -1,0 +1,20 @@
+{
+  "accion": "restauracion",
+  "inicio": "2026-10-31T21:15:42+00:00",
+  "fin": "2026-10-31T21:15:42+00:00",
+  "estado": "completada",
+  "version_anterior": "20261031T125220Z_8fa59a93",
+  "version_restaurada": "20261031T123304Z_888cb1b5",
+  "integridad_sha256": true,
+  "aceptacion_verificada": true,
+  "control_estimaciones": {
+    "aprobado": true,
+    "errores": [],
+    "advertencias": [],
+    "registros": 4,
+    "detalle": {}
+  },
+  "modelos_verificados": 2,
+  "tablero_consultable": true,
+  "detalle_tablero": "El puntero, estimaciones, metadatos y modelos requeridos estan disponibles."
+}

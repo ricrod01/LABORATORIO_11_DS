@@ -1,7 +1,6 @@
-# Se ejecuta desde scripts/ con: python pipeline.py --config config.yaml
+# Desde la raiz: python scripts/pipeline.py --config scripts/config.yaml
 # Configuración limitada deliberadamente a AEREA y TERRESTRE.
-# Las fechas de validación y pronóstico son propuestas provisionales: verificar
-# contra la cobertura real de ambas vías antes de entregar el laboratorio.
+# La cobertura observada termina en 2026-06 y el pronostico inicia en 2026-07.
 # NO se publica nada sin destino y umbral MAE justificados.
 lectura:
   separador: ';'
@@ -63,8 +62,8 @@ controles:
     - tipo_viajero
     cantidad_minima: 0
     cobertura:
-      fecha_inicio: null
-      fecha_fin: null
+      fecha_inicio: 2009-01
+      fecha_fin: 2026-06
       vias_esperadas:
       - AEREA
       - TERRESTRE
@@ -159,7 +158,8 @@ mlflow:
   tracking_uri: http://mlflow:5000
   experimento: Observatorio_Inteligencia_Turistica
 monitoreo:
-  variacion_relativa_maxima: null
+  # Una variacion mensual mayor a 50% requiere revision, pero no rechaza por si sola.
+  variacion_relativa_maxima: 0.50
   umbral_duplicados: 0
   umbral_faltantes_criticos: 0
   alertar_actualizacion_atrasada: true
