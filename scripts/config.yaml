@@ -158,8 +158,8 @@ mlflow:
   tracking_uri: http://mlflow:5000
   experimento: Observatorio_Inteligencia_Turistica
 monitoreo:
-  # Una variacion mensual mayor a 50% requiere revision, pero no rechaza por si sola.
-  variacion_relativa_maxima: 0.50
+  # Una variacion mensual mayor a 15% requiere revision, pero no rechaza por si sola.
+  variacion_relativa_maxima: 0.15
   umbral_duplicados: 0
   umbral_faltantes_criticos: 0
   alertar_actualizacion_atrasada: true

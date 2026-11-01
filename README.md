@@ -68,7 +68,7 @@ python .\scripts\pipeline.py --config .\scripts\config.yaml
 
 ## Monitoreo
 
-Cada ejecucion deja:
+Cada ejecución registra su estado y las evidencias disponibles. El archivo monitoreo.json se genera únicamente cuando el pipeline completa la etapa de monitoreo.
 
 - `logs/pipeline_<ID>.log`: inicio, fin, etapas, advertencias y errores.
 - `reportes/<ID>/ejecucion.json`: estado completo y resultado de publicacion.
@@ -158,7 +158,7 @@ Desde un clon nuevo solo se necesita incorporar la fuente institucional y luego
 ejecutar:
 
 ```bash
-git clone <URL_PRIVADA>
+git clone https://github.com/ricrod01/LABORATORIO_11_DS.git
 cd LABORATORIO_11_DS
 export GIT_COMMIT="$(git rev-parse HEAD)"
 docker compose build
